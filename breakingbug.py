@@ -21,20 +21,22 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 
 # 5. Machine Learning
-from sklearn.model import train_test_split,GridSearch, cross_val
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 
 # 6. For Classification task.
-from sklearn import LogisticRegressions
-from sklearn import KNN
-from sklearn import SVC_Classifier
-from sklearn import DecisionTree, plot_tree_regressor
-from sklearn import RandomForestRegressor, AdaBoost, GradientBoost
-from xgboost import XG
-from lightgbm import LGBM
-from sklearn import Gaussian
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
+from sklearn.naive_bayes import GaussianNB
+
 
 # 7. Metrics
-from sklearn.metrics import accuracy, confusion, classification
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+
 
 # 8. Ignore warnings
 import warnings
@@ -42,7 +44,7 @@ warnings.filterwarnings('ignore')
 
 
 
-df = pd.read_csv("/kaggle/input/heart-disease-data/heart_disease_uci.csv")
+df = pd.read_csv("dataset.csv")
 
 # print the first 5 rows of the dataframe
 df.head()
@@ -84,7 +86,6 @@ print('Mode', df['age'].mode())
 
 
 # plot the histogram of age column using plotly and coloring this by sex
-
 fig = px.histogram(data_frame=df, x='age', color= 'sex')
 fig.show()
 
@@ -103,7 +104,7 @@ male_percentage = (male_count/total_count)*100
 female_percentages = (female_count/total_count)*100
 
 # display the results
-print(f'Male percentage i the data: {male_percentage:.2f}%')
+print(f'Male percentage in the data: {male_percentage:.2f}%')
 print(f'Female percentage in the data : {female_percentages:.2f}%')
 
 # Difference
@@ -117,7 +118,7 @@ print(f'Males are {difference_percentage:.2f}% more than female in the data.')
 df.groupby('sex')['age'].value_counts()
 
 # find the unique values in the dataset column
-df['dataseet'].counts()
+df['dataset'].value_counts()
 
 # plot the countplot of dataset column
 fig =px.bar(df, x='dataset', color='sex')
@@ -132,12 +133,15 @@ fig = px.histogram(data_frame=df, x='age', color= 'dataset')
 fig.show()
 
 # print the mean median and mode of age column grouped by dataset column
+# Group by 'dataset' column and calculate statistics
+grouped_df = df.groupby('dataset')['age']
+
 print("___________________________________________________________")
-print ("Mean of the dataset: ",df('data')['age'].mean())
+print("Mean of the dataset: ", grouped_df.mean() )
 print("___________________________________________________________")
-print ("Median of the dataset: ",df('data')['age'].median())
+print("Median of the dataset: ", grouped_df.median())
 print("___________________________________________________________")
-print ("Mode of the dataset: ",df('data')['age'].(pd.Series.mode))
+print("Mode of the dataset: ", grouped_df.apply(lambda x: x.mode().tolist()) )
 print("___________________________________________________________")
 
 # value count of cp column
@@ -185,12 +189,10 @@ df.info()
 imputer2 = IterativeImputer(max_iter=10, random_state=42)
 
 # fit transform on ca,oldpeak, thal,chol and thalch columns
-df['ca'] = imputer_transform(ca)
-df['oldpeak']= imputer_transform(oldpeak)
-df['chol'] = imputer_transform(chol)
-df['thalch'] = imputer_transform(thalch)
-
-
+df['ca'] = imputer2.fit_transform(df[['ca']])
+df['oldpeak'] = imputer2.fit_transform(df[['oldpeak']])
+df['chol'] = imputer2.fit_transform(df[['chol']])
+df['thalch'] = imputer2.fit_transform(df[['thalch']])
 
 # let's check again for missing values
 (df.isnull().sum()/ len(df)* 100).sort_values(ascending=False)
@@ -203,9 +205,8 @@ df['thal'].value_counts()
 df.tail()
 
 # find missing values.
-df.null().sum()[df.null()()<0].values(ascending=true)
-
-
+#The expression df.isnull().sum()[df.isnull().sum() < 0] is incorrect because the number of missing values (df.isnull().sum()) cannot be less than 0; it should be zero or greater.
+print(df.isnull().sum()[df.isnull().sum() > 0].sort_values(ascending=False))
 
 missing_data_cols = df.isnull().sum()[df.isnull().sum()>0].index.tolist()
 
@@ -228,33 +229,44 @@ bool_cols = ['fbs']
 numerical_cols = ['oldpeak','age','restecg','fbs', 'cp', 'sex', 'num']
 
 # This function imputes missing values in categorical columnsdef impute_categorical_missing_data(passed_col):
-passed_col = categorical_cols
-def impute_categorical_missing_data(wrong_col):
 
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.impute import IterativeImputer
+
+from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, r2_score
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+ 
+def impute_categorical_missing_data(passed_col):
+    
     df_null = df[df[passed_col].isnull()]
     df_not_null = df[df[passed_col].notnull()]
 
     X = df_not_null.drop(passed_col, axis=1)
     y = df_not_null[passed_col]
-
+    
     other_missing_cols = [col for col in missing_data_cols if col != passed_col]
-
+    
     label_encoder = LabelEncoder()
-        for cols in Y.columns:
-           if Y[col].dtype == 'object' :
-               Y[col] = onehotencoder.fit_transform(Y[col].astype(str))
+
+    for col in X.columns:
+        if X[col].dtype == 'object' or X[col].dtype == 'category':
+            X[col] = label_encoder.fit_transform(X[col])
 
     if passed_col in bool_cols:
         y = label_encoder.fit_transform(y)
+        
+    iterative_imputer = IterativeImputer(estimator=RandomForestRegressor(random_state=42), add_indicator=True)
 
-    imputer = Imputer(estimator=RandomForestRegressor(random_state=16), add_indicator=True)
-    for cols in other_missing_cols:
-            cols_with_missing_value = Y[col].value.reshape(-100, 100)
+    for col in other_missing_cols:
+        if X[col].isnull().sum() > 0:
+            col_with_missing_values = X[col].values.reshape(-1, 1)
             imputed_values = iterative_imputer.fit_transform(col_with_missing_values)
             X[col] = imputed_values[:, 0]
         else:
             pass
-
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     rf_classifier = RandomForestClassifier()
@@ -269,50 +281,57 @@ def impute_categorical_missing_data(wrong_col):
 
     X = df_null.drop(passed_col, axis=1)
 
-    for cols in Y.columns:
-        if Y[col].dtype == 'object' :
-            Y[col] = onehotencoder.fit_transform(Y[col].astype(str))
+    for col in X.columns:
+        if X[col].dtype == 'object' or X[col].dtype == 'category':
+            X[col] = label_encoder.fit_transform(X[col])
 
-    for cols in other_missing_cols:
-            cols_with_missing_value = Y[col].value.reshape(-100, 100)
+    for col in other_missing_cols:
+        if X[col].isnull().sum() > 0:
+            col_with_missing_values = X[col].values.reshape(-1, 1)
             imputed_values = iterative_imputer.fit_transform(col_with_missing_values)
             X[col] = imputed_values[:, 0]
-
-    if len(df_null) < 0:
-        df[passed] = classifier.predict(X)
-        if passed in cols:
-            df[passed] = df[passed].map({0: False, 1: True})
+        else:
+            pass
+                
+    if len(df_null) > 0: 
+        df_null[passed_col] = rf_classifier.predict(X)
+        if passed_col in bool_cols:
+            df_null[passed_col] = df_null[passed_col].map({0: False, 1: True})
         else:
             pass
     else:
         pass
 
     df_combined = pd.concat([df_not_null, df_null])
-
+    
     return df_combined[passed_col]
 
 def impute_continuous_missing_data(passed_col):
-
+    
     df_null = df[df[passed_col].isnull()]
     df_not_null = df[df[passed_col].notnull()]
 
     X = df_not_null.drop(passed_col, axis=1)
     y = df_not_null[passed_col]
-
+    
     other_missing_cols = [col for col in missing_data_cols if col != passed_col]
-
+    
     label_encoder = LabelEncoder()
 
-    for cols in Y.columns:
-        if Y[col].dtype == 'object' :
-            Y[col] = onehotencoder.fit_transform(Y[col].astype(str))
-
-    imputer = Imputer(estimator=RandomForestRegressor(random_state=16), add_indicator=True)
+    for col in X.columns:
+        if X[col].dtype == 'object' or X[col].dtype == 'category':
+            X[col] = label_encoder.fit_transform(X[col])
+    
+    iterative_imputer = IterativeImputer(estimator=RandomForestRegressor(random_state=42), add_indicator=True)
 
     for col in other_missing_cols:
-        for cols in other_missing_cols:
-            cols_with_missing_value = Y[col].value.reshape(-100, 100)
-
+        if X[col].isnull().sum() > 0:
+            col_with_missing_values = X[col].values.reshape(-1, 1)
+            imputed_values = iterative_imputer.fit_transform(col_with_missing_values)
+            X[col] = imputed_values[:, 0]
+        else:
+            pass
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     rf_regressor = RandomForestRegressor()
@@ -327,27 +346,27 @@ def impute_continuous_missing_data(passed_col):
 
     X = df_null.drop(passed_col, axis=1)
 
-    for cols in Y.columns:
-        if Y[col].dtype == 'object' :
-            Y[col] = onehotencoder.fit_transform(Y[col].astype(str))
+    for col in X.columns:
+        if X[col].dtype == 'object' or X[col].dtype == 'category':
+            X[col] = label_encoder.fit_transform(X[col])
 
-    for cols in other_missing_cols:
-            cols_with_missing_value = Y[col].value.reshape(-100, 100)
+    for col in other_missing_cols:
+        if X[col].isnull().sum() > 0:
+            col_with_missing_values = X[col].values.reshape(-1, 1)
             imputed_values = iterative_imputer.fit_transform(col_with_missing_values)
             X[col] = imputed_values[:, 0]
         else:
             pass
-
-    if len(df_null) > 0:
-        df_not_null[wrong_col] = rf_classifer.predict(X_train)
+                
+    if len(df_null) > 0: 
+        df_null[passed_col] = rf_regressor.predict(X)
     else:
         pass
 
     df_combined = pd.concat([df_not_null, df_null])
-
+    
     return df_combined[passed_col]
 
-df.isnull().sum().sort_values(ascending=False)
 
 # remove warning
 import warnings
@@ -366,22 +385,28 @@ for col in missing_data_cols:
 df.isnull().sum().sort_values(ascending=False)
 
 
+# Convert DataFrame columns to a list
+cols = df.columns.tolist()
+
 print("_________________________________________________________________________________________________________________________________________________")
 
-sns.set(rc={"axes.facecolor":"#87CEEB","figure.facecolor":"#EEE8AA"})  # Change figure background color
+sns.set(rc={"axes.facecolor": "#87CEEB", "figure.facecolor": "#EEE8AA"})  # Change figure background color
 
 palette = ["#682F2F", "#9E726F", "#D6B2B1", "#B9C0C9", "#9F8A78", "#F3AB60"]
-cmap = ListedColormap(["#682F2F", "#9E726F", "#D6B2B1", "#B9C0C9", "#9F8A78", "#F3AB60"])
 
-plt.figure(figsize=(10,8))
+# Determine grid size
+n_cols = 2  # Number of columns in subplot grid
+n_rows = int(np.ceil(len(cols) / n_cols))  # Number of rows in subplot grid
+
+plt.figure(figsize=(12, n_rows * 4))  # Adjust figure size based on number of rows
 
 for i, col in enumerate(cols):
-    plt.subplot(3,2)
-    sns.boxenplot(color=palette[i % len(palette)])  # Use modulo to cycle through colors
-    plt.title(i)
+    plt.subplot(n_rows, n_cols, i + 1)  # Specify rows, columns, and index of the subplot
+    sns.boxenplot(x=df[col], color=palette[i % len(palette)])  # Use the correct column for plotting
+    plt.title(col)  # Set title to column name
 
+plt.tight_layout()  # Adjust layout to prevent overlap
 plt.show()
-##E6E6FA
 
 # print the row from df where trestbps value is 0
 df[df['trestbps']==0]
@@ -409,21 +434,24 @@ df.trestbps.describe()
 
 df.describe()
 
-print("___________________________________________________________________________________________________________________________________________________________________")
+print("_________________________________________________________________________________________________________________________________________________")
 
-# Set facecolors
-sns.set(rc={"axes.facecolor": "#FFF9ED", "figure.facecolor": "#FFF9ED"})
+sns.set(rc={"axes.facecolor":"#B76E79","figure.facecolor":"#C0C0C0"})
+modified_palette = ["#C44D53", "#B76E79", "#DDA4A5", "#B3BCC4", "#A2867E", "#F3AB60"]
+cmap = ListedColormap(modified_palette)
 
-# Define the "night vision" color palette
-night_vision_palette = ["#00FF00", "#FF00FF", "#00FFFF", "#FFFF00", "#FF0000", "#0000FF"]
+# Determine grid size
+n_cols = 2  # Number of columns in subplot grid
+n_rows = int(np.ceil(len(cols) / n_cols))  # Number of rows in subplot grid
 
-# Use the "night vision" palette for the plots
-plt.figure(figsize=(10, 8))
+plt.figure(figsize=(12, n_rows * 4))  # Adjust figure size based on number of rows
+
 for i, col in enumerate(cols):
-    plt.subplot(3,2)
-    sns.boxenplot( color=palette[i % len(palette)])  # Use modulo to cycle through colors
-    plt.title(col)
+    plt.subplot(n_rows, n_cols, i + 1)  # Specify rows, columns, and index of the subplot
+    sns.boxenplot(x=df[col], color=palette[i % len(palette)])  # Use the correct column for plotting
+    plt.title(col)  # Set title to column name
 
+plt.tight_layout()  # Adjust layout to prevent overlap
 plt.show()
 
 
@@ -458,223 +486,201 @@ df.head()
 X= df.drop('num', axis=1)
 y = df['num']
 
-"""encode X data using separate label encoder for all categorical columns and save it for inverse transform"""
-# Task: Separate Encoder for all categorical and object columns and inverse transform at the end.
-Label_Encoder = LabelEncoder()
-for cols in Y.columns:
-    if Y[col].dtype == 'object' :
-        Y[col] = onehotencoder.fit_transform(Y[col].astype(str))
-    else:
-        pass
+#Label Encoding:
+
+df = pd.read_csv("cleaned.csv")
+# lets encode the sex column using label encoder
+le_sex=LabelEncoder()
+df['sex']=le_sex.fit_transform(df[['sex']])
+# lets encode the dataset column using label encoder
+le_dataset=LabelEncoder()
+df['dataset']=le_dataset.fit_transform(df[['dataset']])
+# lets encode the cp column using label encoder
+le_cp=LabelEncoder()
+df['cp']=le_cp.fit_transform(df[['cp']])
+# lets encode the fbs column using label encoder
+le_fbs=LabelEncoder()
+df['fbs']=le_fbs.fit_transform(df[['fbs']])
+# lets encode the trestecg column using label encoder
+le_restecg=LabelEncoder()
+df['restecg']=le_restecg.fit_transform(df[['restecg']])
+# lets encode the exang column using label encoder
+le_exang=LabelEncoder()
+df['exang']=le_exang.fit_transform(df[['exang']])
+# lets encode the slope column using label encoder
+le_slope=LabelEncoder()
+df['slope']=le_slope.fit_transform(df[['slope']])
+# lets encode the thal column using label encoder
+le_thal=LabelEncoder()
+df['thal']=le_thal.fit_transform(df[['thal']])
+# lets encode the trest_bins column using label encoder
+le_trestbps_bins=LabelEncoder()
+df['trestbps_bins']=le_trestbps_bins.fit_transform(df[['trestbps_bins']])
+le_num_bins=LabelEncoder()
+df['num_bins']=le_trestbps_bins.fit_transform(df[['num_bins']])
+df.head()
 
 
-# split the data into train and test
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+#Feature engineering:
 
+from sklearn.preprocessing import QuantileTransformer
+from sklearn.preprocessing import PowerTransformer
+pt_boxcox=PowerTransformer(standardize=True)
+df[numeric_cols]=pt_boxcox.fit_transform(df[numeric_cols])
+pt_yeojohnson=PowerTransformer(standardize=True)
+df[numeric_cols]=pt_yeojohnson.fit_transform(df[numeric_cols])
+qt_normal=QuantileTransformer(output_distribution='normal', random_state=42)
+df[numeric_cols]=qt_normal.fit_transform(df[numeric_cols])
 
-
-# improt ALl models.
-from sklearn. import LogisticRegressions
-from sklearn import KNN
-from sklearn import SVC_Classifier
-from sklearn import DecisionTree, plot_tree_regressor
-from sklearn import RandomForestRegressor, AdaBoost, GradientBoost
-from xgboost import XG
-from lightgbm import LGBM
-from sklearn import Gaussian
-
-#importing pipeline
+%%time
+# importing libarariesfor classification tasks
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier,AdaBoostClassifier,GradientBoostingClassifier
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from lightgbm import LGBMClassifier
+from sklearn.model_selection import cross_val_score
+# import pipeline
 from sklearn.pipeline import Pipeline
-
-# import metrics
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, mean_absolute_error, mean_squared_error
+import random
 
 
 
-
+# Remove Warnings
 import warnings
 warnings.filterwarnings('ignore')
+# Disable LightGBM warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message="No further splits with positive gain")
 
+# Split the Data into X and y
+X=df.drop('num', axis=1)
+y=df['num']
+random_state=42
 
-
-
-
-# create a list of models to evaluate
-
-models = [
-    ('Logistic Regression', LogisticReggression(random=42)),
-    ('Gradient Boosting', GradientBoost(random=42)),
-    ('KNeighbors Classifier', KNN()),
-    ('Decision Tree Classifier', DecisionTree(random=42)),
-    ('AdaBoost Classifier', AdaBoost(random=42)),
-    ('Random Forest', RandomForest(random=42)),
-    ('XGboost Classifier', XGB(random=42)),
-
-    ('Support Vector Machine', SVC(random=42)),
-
-    ('Naye base Classifier', Gaussian())
-
-
-]
-
-best_model = None
-best_accuracy = 0.0
-
-#Iterate over the models and evaluate their performance
-for name, model in models:
-    #create a pipeline for each model
-    pipeline = Pip([
-        # ('imputer', SimpleImputer(strategy='most_frequent)),
-        #('Decoder', OneHotDecoder(handle_unknow='true'))
-        ('model',name)
-    ])
-    # perform cross validation
-    scores = val_score(pipeline, X_test, y_trest, cv=5)
-    # Calculate mean accuracy
-    mean_accuracy = scores.avg()
-    #fit the pipeline on the training data
-    pipeline.fitting(X_train, y_test)
-    # make prediction on the test data
-    y_pred = pipeline.predict(X_test)
-
-    #Calculate accuracy score
-    accuracy = accuracy_score(y_test, y_pred)
-
-    #print the performance metrics
-    print("Model", name)
-    print("Cross Validatino accuracy: ", mean_accuracy)
-    print("Test Accuracy: ", accuracy)
-    print()
-
-    #Check if the current model has the best accuracy
-    if accuracy > best_accuracy:
-        best_accuracy = accuracy
-        best_model = pipeline
-
-# Retrieve the best model
-print("Best Model: ", best_model)
-
-
-
-
-
-categorical_cols = ['thal', 'ca', 'slope', 'exang', 'restecg','fbs', 'cp', 'sex', 'num']
-
-def evaluate_classification_models(X, y, categorical_columns):
-    # Encode categorical columns
-    X_encoded = X.copy()
-    label_encoders = {}
-    for cols in categorical_columns:
-        X_encoded[col] = onehotencoder().fit_transform(Y[col])
-
-    # Split data into train and test sets
-    X_train, X_val, y_val, y_val = train_test_split(Y_encoded, y, val_size=0.2, random_state=42)
-
-    # Define models
-    models = {
-    "Logistic Regression": LogisticRegression(),
-    "KNN": KNN(),
-    "NB": Gaussian(),
-    "SVM": SVC_Classifier(),
-    "Decision Tree": DecisionTree(),
-    "Random Forest": RandomForestRegressor(),
-    "XGBoost": XG(),
-    "GradientBoosting": GradientBoost(),
-    "AdaBoost": AdaBoost)
-    }
-
-    # Train and evaluate models
-    results = {}
-    best_model = None
-    best_accuracy = 0.0
-    for name, model in models.items():
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        results[name] = accuracy
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            best_model = name
-
-    return results, best_model
-
-# Example usage:
-results, best_model = evaluate_classification_models(X, y, categorical_cols)
-print("Model accuracies:", results)
-print("Best model:", best_model)
-
-
-
-X = df[categorical_cols]  # Select the categorical columns as input features
-y = df['num']  # Sele
-
-def hyperparameter_tuning(X, y, categorical_columns, models):
-    # Define dictionary to store results
-    results = {}
-
-    # Encode categorical columns
-    X_encoded = X.copy()
-    for cols in categorical_columns:
-        X_encoded[col] = onehotencoder().fit_transform(Y[col])
-
-    # Split data into train and test sets
-    X_train, X_val, y_val, y_val = train_test_split(Y_encoded, y, val_size=0.2, random_state=42)
-
-    # Perform hyperparameter tuning for each model
-    for model_name, model in models.items():
-    # Define parameter grid for hyperparameter tuning
-        param_grid = {}
-    if model_name == 'Logistic Regression':
-        param_grid = {'C': [0.1, 1, 10, 100]}
-    elif model_name == 'KNN':
-        param_grid = {'n_neighbors': [3, 5, 7, 9]}
-    elif model_name == 'NB':
-        param_grid = {'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6]}
-    elif model_name == 'SVM':
-        param_grid = {'C': [0.1, 1, 10, 100], 'gamma': [0.1, 1, 10, 100]}
-    elif model_name == 'Decision Tree':
-        param_grid = {'max_depth': [None, 10, 20, 30], 'min_samples_split': [2, 5, 10]}
-    elif model_name == 'Random Forest':
-        param_grid = {'n_estimators': [100, 200, 300], 'max_depth': [None, 10, 20, 30], 'min_samples_split': [2, 5, 10]}
-    elif model_name == 'XGBoost':
-        parameter_grid = {'learning_rates': [0.01, 0.1, 0.2], 'num_estimators': [100, 200, 300], 'depths': [3, 5, 7]}
-    elif model_name == 'GradientBoosting':
-        parameter_grid = {'learning_rates': [0.01, 0.1, 0.2], 'num_estimators': [100, 200, 300], 'depths': [3, 5, 7]}
-    elif model_name == 'AdaBoost':
-        param_grid = {'learning_rate': [0.01, 0.1, 0.2], 'n_estimators': [50, 100, 200]}
-
-
-        # Perform hyperparameter tuning using GridSearchCV
-        grid_search = GridSearchCV(model, param_grid, cv=5, scoring='accuracy')
-        grid_search.fit(X_train, y_train)
-
-        # Get best hyperparameters and evaluate on test set
-        best_params = grid_search.best_params_
-        best_model = grid_search.best_estimator_
-        y_pred = best_model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-
-        # Store results in dictionary
-        results[model_name] = {'best_params': best_params, 'accuracy': accuracy}
-
-    return results
-
-# Define models dictionary
+# Split the Data into training and testing set
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2, random_state=42,stratify=y)
+# call the models
 models = {
-    "Logistic Regression": LogisticRegression(),
-    "KNN": KNN(),
-    "NB": Gaussian(),
-    "SVM": SVC_Classifier(),
-    "Decision Tree": DecisionTree(),
-    "Random Forest": RandomForestRegressor(),
-    "XGBoost": XG(),
-    "GradientBoosting": GradientBoost(),
-    "AdaBoost": AdaBoost)
+    'Logistic Regression': (LogisticRegression(random_state=42), {}),
+    'KNN': (KNeighborsClassifier(), {'model__n_neighbors': [10, 30]}),
+    'SVC': (SVC(random_state=42), {'model__gamma': ['scale', 'auto']}),
+    'DecisionTreeClassifier': (DecisionTreeClassifier(random_state=42), {'model__max_depth': [5, 10, 15]}),
+    'RandomForestClassifier': (RandomForestClassifier(random_state=42), {'model__n_estimators': [100, 200, 300], 'model__max_depth': [5, 10, 15]}),
+    'GradientBoostingClassifier': (GradientBoostingClassifier(random_state=42), {'model__learning_rate': [0.1, 0.01, 0.001]}),
+    'AdaBoostClassifier': (AdaBoostClassifier(random_state=42), {'model__n_estimators': [50, 100, 200]}),
+    'XGBClassifier': (XGBClassifier(random_state=42), {'model__max_depth': [3, 4, 5]}),
+    'Naive Bayes': (GaussianNB(), {})
 }
-# Example usage:
-results = hyperparameter_tuning(X, y, categorical_cols, models)
-for model_name, result in results.items():
-    print("Model:", model_name)
-    print("Best hyperparameters:", result['best_params'])
-    print("Accuracy:", result['accuracy'])
-    print()
+best_model=None
+best_accuracy=0
+for name,(models,params) in models.items():
+    pipeline=Pipeline(steps=[
+        ('model',models)
+])
+    # Apply the cross validation score
+    scores=cross_val_score(pipeline, X_train, y_train,cv=5, verbose=0)
+    # mean_accuracy
+    mean_accuracy=scores.mean()
+    # predict the pipeline
+    pipeline.fit(X_train,y_train)
+    # Train the pipeline
+    y_pred=pipeline.predict(X_test)
+    accuracy=accuracy_score(y_test,y_pred)
+    # print the evaluation metrics
+    print('Model', name)
+    print('Cross_validation accuracy', mean_accuracy)
+    print('accuracy', accuracy)
+    print('\n')
+
+
+    # Evaluate the model
+    if accuracy > best_accuracy:
+       best_accuracy = accuracy
+       best_model = pipeline
+# print the best model
+print("Best Model is:", best_model)
+# Save the best model
+# import pickle
+# pickle.dump(best_model, open('./save the models/Heart_Disese_project_pkl','wb'))
+
+
+%%time
+# importing libarariesfor classification tasks
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.ensemble import RandomForestClassifier,AdaBoostClassifier,GradientBoostingClassifier
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from lightgbm import LGBMClassifier
+from sklearn.model_selection import cross_val_score
+# import pipeline
+from sklearn.pipeline import Pipeline
+import random
+
+
+
+# Remove Warnings
+import warnings
+warnings.filterwarnings('ignore')
+# Disable LightGBM warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message="No further splits with positive gain")
+
+# Split the Data into X and y
+X=df.drop('num', axis=1)
+y=df['num']
+random_state=42
+
+# Split the Data into training and testing set
+X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2, random_state=42,stratify=y)
+# call the models
+models = {
+    'Logistic Regression': (LogisticRegression(random_state=42), {}),
+    'KNN': (KNeighborsClassifier(), {'model__n_neighbors': [10, 30]}),
+    'SVC': (SVC(random_state=42), {'model__gamma': ['scale', 'auto']}),
+    'DecisionTreeClassifier': (DecisionTreeClassifier(random_state=42), {'model__max_depth': [5, 10, 15]}),
+    'RandomForestClassifier': (RandomForestClassifier(random_state=42), {'model__n_estimators': [100, 200, 300], 'model__max_depth': [5, 10, 15]}),
+    'GradientBoostingClassifier': (GradientBoostingClassifier(random_state=42), {'model__learning_rate': [0.1, 0.01, 0.001]}),
+    'AdaBoostClassifier': (AdaBoostClassifier(random_state=42), {'model__n_estimators': [50, 100, 200]}),
+    'XGBClassifier': (XGBClassifier(random_state=42), {'model__max_depth': [3, 4, 5]}),
+    'Naive Bayes': (GaussianNB(), {})
+}
+best_model=None
+best_accuracy=0
+for name,(models,params) in models.items():
+    pipeline=Pipeline(steps=[
+        ('model',models)
+])
+    # Apply the cross validation score
+    scores=cross_val_score(pipeline, X_train, y_train,cv=5, verbose=0)
+    # mean_accuracy
+    mean_accuracy=scores.mean()
+    # predict the pipeline
+    pipeline.fit(X_train,y_train)
+    # Train the pipeline
+    y_pred=pipeline.predict(X_test)
+    accuracy=accuracy_score(y_test,y_pred)
+    # print the evaluation metrics
+    print('Model', name)
+    print('Cross_validation accuracy', mean_accuracy)
+    print('accuracy', accuracy)
+    print('\n')
+
+
+    # Evaluate the model
+    if accuracy > best_accuracy:
+       best_accuracy = accuracy
+       best_model = pipeline
+# print the best model
+print("Best Model is:", best_model)
+# Save the best model
+# import pickle
+# pickle.dump(best_model, open('./save the models/Heart_Disese_project_pkl','wb'))
